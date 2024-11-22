@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>org.threeform.idea.plugins.zen_editor</id>
+    <name>Zen Editor</name>
+    <version>1.0</version>
+    <vendor email="jonathan.glanz@gmail.com" url="https://github.com/jglanz">profile</vendor>
+
+    <description><![CDATA[
+      <b>Reach true ZEN in your editor</b><br>
+      <br>
+      <ul>
+        <li>Every editor is decorated with a header, which includes the title and file path</li>
+        <li>More to come in the future...</li>
+      </ul>
+      <br>
+      <br>
+    ]]></description>
+
+    <change-notes><![CDATA[
+      Initial release
+    ]]>
+    </change-notes>
+
+    <!-- please see https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html for description -->
+    <idea-version since-build="242" until-build="243.*"/>
+
+    <!-- please see https://plugins.jetbrains.com/docs/intellij/plugin-compatibility.html
+          on how to target different products -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity implementation="org.threeform.idea.plugins.ZenEditorActivity"/>
+    </extensions>
+
+    <actions>
+    </actions>
+
+</idea-plugin>
