@@ -9,7 +9,7 @@ plugins {
 
 group = "org.threeform.idea.plugins"
 
-version = "1.0.0"
+version = "1.0.1"
 
 repositories {
     mavenCentral()
@@ -42,7 +42,7 @@ tasks {
 //    }
 
     publishPlugin {
-        token.set(System.getenv("PUBLISH_TOKEN"))
+        token.set(System.getenv("PUBLISH_TOKEN").ifEmpty { System.getenv("JB_PLUGIN_TOKEN") })
     }
 
     // Set the JVM compatibility versions

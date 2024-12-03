@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>org.threeform.idea.plugins.zen_editor</id>
     <name>Zen Editor</name>
-    <version>1.0</version>
+    <version>1.0.1</version>
     <vendor email="jonathan.glanz@gmail.com" url="https://github.com/jglanz">profile</vendor>
 
     <description><![CDATA[
@@ -16,7 +16,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
-      Initial release
+      <h4>v1.0.1: A few changes/fixes</h4>
+      <ul>
+        <li>Created a custom component to facilitate content measurement</li>
+        <li>Implemented `BulkFileListener` in order to render refactored/renamed
+          files properly</li>
+      </ul>
+      <br/><br/>
+      <h4>v1.0.0: Initial release</h4>
     ]]>
     </change-notes>
 

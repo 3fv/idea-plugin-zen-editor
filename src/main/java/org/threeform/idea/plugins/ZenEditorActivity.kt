@@ -8,8 +8,13 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
 import java.util.*
 import javax.swing.JComponent
+
 
 /**
  * ZenEditorActivity is responsible for both
@@ -26,7 +31,8 @@ class ZenEditorActivity : ProjectActivity {
      * > NOTE: `JComponent` (the editor UI) is used as the key because a single
      * >  file can have multiple open editors
      */
-    private val activeEditors = Collections.synchronizedMap(IdentityHashMap<JComponent, ZenEditorInstall>())
+    private val activeEditors =
+        Collections.synchronizedMap(IdentityHashMap<JComponent, Pair<Project, ZenEditorInstall>>())
 
     init {
         // GET CONNECTION TO MESSAGE BUS
@@ -45,6 +51,29 @@ class ZenEditorActivity : ProjectActivity {
 
             }
         })
+
+        connect.subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    val editorsToSetup: MutableList<Pair<Project, ZenEditorInstall>> = mutableListOf()
+                    events.forEach { ev ->
+                        if (ev !is VFilePropertyChangeEvent || ev.propertyName != "name") return@forEach
+
+
+                        activeEditors.forEach { (_, pair) ->
+                            val install = pair.second
+                            if (install.myFile == ev.file || install.myFile.path == ev.file.path || install.myFile.path == ev.oldPath) {
+                                editorsToSetup.add(Pair(install.myProject, install))
+                            }
+                        }
+                    }
+                    editorsToSetup.forEach { (project, install) ->
+                        setupEditor(project, install.myEditor)
+                    }
+
+                }
+            })
     }
 
     /**
@@ -62,7 +91,7 @@ class ZenEditorActivity : ProjectActivity {
         activeEditors.keys
             .filter { !editorComponents.contains(it) }
             .forEach {
-                activeEditors[it]?.dispose()
+                activeEditors[it]?.second?.dispose()
                 activeEditors.remove(it)
             }
 
@@ -72,15 +101,29 @@ class ZenEditorActivity : ProjectActivity {
         }
     }
 
+    /**
+     * Setup an individual editor/header
+     */
     private fun setupEditor(project: Project, editor: FileEditor?) {
-        val fem = FileEditorManager.getInstance(project)
-        log.info("Setting up editor: ${editor?.file?.name ?: "null"}")
+        if (log.isDebugEnabled)
+            log.debug("Setting up editor: ${editor?.file?.name ?: "null"}")
 
-        if (editor == null || activeEditors.containsKey(editor.component)) {
+        if (editor == null) {
             return
         }
 
-        activeEditors[editor.component] = ZenEditorInstall(project, editor.file, editor)
+        if (activeEditors.containsKey(editor.component)) {
+            val install = activeEditors[editor.component]!!.second
+            if (install.myPath === editor.file.path && install.myFile == editor.file && install.myFile.path == editor.file.path) {
+                return
+            }
+
+            install.dispose()
+            activeEditors.remove(editor.component)
+        }
+
+        activeEditors[editor.component] = Pair(project, ZenEditorInstall(project, editor.file, editor))
+
 
     }
 
