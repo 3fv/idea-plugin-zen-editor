@@ -9,7 +9,7 @@ plugins {
 
 group = "org.threeform.idea.plugins"
 
-version = "1.0.1"
+version = "1.0.2"
 
 repositories {
     mavenCentral()
@@ -31,6 +31,8 @@ intellijPlatform {
 
 tasks {
     patchPluginXml {
+        pluginVersion.set(project.version.toString())
+
         sinceBuild.set("242")
         untilBuild.set("243.*")
     }
@@ -42,7 +44,10 @@ tasks {
 //    }
 
     publishPlugin {
-        token.set(System.getenv("PUBLISH_TOKEN").ifEmpty { System.getenv("JB_PLUGIN_TOKEN") })
+        val envToken = System.getenv("PUBLISH_TOKEN") ?: System.getenv("JB_PLUGIN_TOKEN")
+        if (envToken != null) {
+            token.set(envToken)
+        }
     }
 
     // Set the JVM compatibility versions

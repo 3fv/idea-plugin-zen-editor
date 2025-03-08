@@ -1,8 +1,8 @@
 <idea-plugin>
     <id>org.threeform.idea.plugins.zen_editor</id>
     <name>Zen Editor</name>
-    <version>1.0.1</version>
-    <vendor email="jonathan.glanz@gmail.com" url="https://github.com/jglanz">profile</vendor>
+    <version>1.0.2</version>
+    <vendor email="jonathan.glanz@gmail.com" url="https://github.com/jglanz">Jonathan Glanz</vendor>
 
     <description><![CDATA[
       <b>Reach true ZEN in your editor</b><br>

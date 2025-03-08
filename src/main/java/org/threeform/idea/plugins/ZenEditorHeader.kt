@@ -38,7 +38,11 @@ class ZenEditorHeader(
     private val ellipsisLabel: JLabel = JBLabel("...")
 
     init {
-        val filePath = myFile.toNioPath().toAbsolutePath()
+        val filePath = try {
+            myFile.toNioPath().toAbsolutePath()
+        } catch (e: Exception) {
+            "NOT_AVAILABLE"
+        }
         var filePathStr = filePath.toString().replace('\\', '/')
         val projectPath = myProject.basePath
 
