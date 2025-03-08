@@ -9,7 +9,7 @@ plugins {
 
 group = "org.threeform.idea.plugins"
 
-version = "1.0.2"
+version = "1.0.3"
 
 repositories {
     mavenCentral()
@@ -34,7 +34,7 @@ tasks {
         pluginVersion.set(project.version.toString())
 
         sinceBuild.set("242")
-        untilBuild.set("243.*")
+        untilBuild.set("251.*")
     }
 
 //    signPlugin {
@@ -52,7 +52,7 @@ tasks {
 
     // Set the JVM compatibility versions
     withType<JavaCompile> {
-        sourceCompatibility = "17"
+        sourceCompatibility = "21"
         targetCompatibility = "17"
     }
     withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
