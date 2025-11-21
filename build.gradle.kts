@@ -34,7 +34,7 @@ tasks {
         pluginVersion.set(project.version.toString())
 
         sinceBuild.set("242")
-        untilBuild.set("251.*")
+        untilBuild.set("253.*")
     }
 
 //    signPlugin {

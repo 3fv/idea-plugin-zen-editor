@@ -44,7 +44,7 @@ class ZenEditorInstall(
         )
         private const val ACTION_ID_PREFIX = "ZenEditor"
         private val PLUGIN_ID = PluginId.getId("org.threeform.idea.plugins.zen_editor")
-        private val DEFAULT_SIZE = java.awt.Dimension(200, 50)
+        private val DEFAULT_SIZE = java.awt.Dimension(200, 80)
     }
 }
 
