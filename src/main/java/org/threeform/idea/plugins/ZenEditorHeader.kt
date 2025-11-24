@@ -4,17 +4,19 @@ package org.threeform.idea.plugins
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.util.messages.MessageBusConnection
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBLabel
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
+import java.awt.Font
 import javax.swing.JLabel
 import javax.swing.JPanel
 
 class ZenEditorHeader(
-    myProject: Project,
-    myFile: VirtualFile
+    val myProject: Project,
+    val myFile: VirtualFile
 ) : JPanel() {
 
     /**
@@ -37,6 +39,8 @@ class ZenEditorHeader(
      */
     private val ellipsisLabel: JLabel = JBLabel("...")
 
+    private var busConnection: MessageBusConnection? = null
+
     init {
         val filePath = try {
             myFile.toNioPath().toAbsolutePath()
@@ -50,18 +54,49 @@ class ZenEditorHeader(
             filePathStr = filePathStr.substring(projectPath.length + 1)
         }
 
-        filenameLabel = JBLabel(myFile.name).apply {
-            font = font.deriveFont(font.size + 2f)
-        }
+        filenameLabel = JBLabel(myFile.name)
 
         val pathColor = Color.decode("#61AFEF99")
 
-        pathLabel = JBLabel(filePathStr).apply {
-            foreground = pathColor
-        }
+        pathLabel = JBLabel(filePathStr).apply { foreground = pathColor }
 
         ellipsisLabel.foreground = pathColor
 
+        // Apply initial settings and subscribe to changes
+        applySettings(ZenEditorSettings.getInstance().state)
+
+        busConnection = myProject.messageBus.connect()
+        busConnection?.subscribe(ZenEditorSettings.TOPIC, ZenSettingsListener { state ->
+            applySettings(state)
+        })
+
+    }
+
+    private fun applySettings(state: ZenEditorSettings.State) {
+        val baseFont = try {
+            Font(state.fontFamily, Font.PLAIN, state.fontSize)
+        } catch (e: Exception) {
+            font
+        }
+        filenameLabel.font = baseFont.deriveFont((baseFont.size + 2).toFloat())
+        pathLabel.font = baseFont
+        revalidate()
+        repaint()
+    }
+
+    override fun getPreferredSize(): Dimension {
+        val s = super.getPreferredSize()
+        val h = ZenEditorSettings.getInstance().state.headerHeight.coerceIn(
+            ZenEditorSettings.MIN_HEIGHT,
+            ZenEditorSettings.MAX_HEIGHT
+        )
+        return Dimension(s.width, h)
+    }
+
+    override fun getMinimumSize(): Dimension {
+        val s = super.getMinimumSize()
+        val h = ZenEditorSettings.MIN_HEIGHT
+        return Dimension(s.width, h)
     }
 
     /**

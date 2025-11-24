@@ -20,11 +20,7 @@ class ZenEditorInstall(
     private val baselineVersion = ApplicationInfo.getInstance().build.baselineVersion
 
     private val headerContent = ZenEditorHeader(myProject, myFile).apply {
-        size = DEFAULT_SIZE
-        minimumSize = DEFAULT_SIZE
-        preferredSize = DEFAULT_SIZE
         background = JBColor.PanelBackground
-
     }
 
     val myPath = myFile.path
@@ -44,7 +40,6 @@ class ZenEditorInstall(
         )
         private const val ACTION_ID_PREFIX = "ZenEditor"
         private val PLUGIN_ID = PluginId.getId("org.threeform.idea.plugins.zen_editor")
-        private val DEFAULT_SIZE = java.awt.Dimension(200, 80)
     }
 }
 

@@ -36,6 +36,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <postStartupActivity implementation="org.threeform.idea.plugins.ZenEditorActivity"/>
+        <applicationConfigurable instance="org.threeform.idea.plugins.ZenEditorSettingsConfigurable"/>
     </extensions>
 
     <actions>
