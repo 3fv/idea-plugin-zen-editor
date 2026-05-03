@@ -40,6 +40,12 @@
     </extensions>
 
     <actions>
+        <action id="ZenEditor.ToggleZenMode"
+                class="org.threeform.idea.plugins.ZenEditorToggleAction"
+                text="Toggle VSCode Zen Editor Mode"
+                description="Hide the editor tab strip and show a banner with the file title and path. Tab management (multi-file open, recent files) keeps working.">
+            <add-to-group group-id="ViewMenu" anchor="last"/>
+        </action>
     </actions>
 
 </idea-plugin>
