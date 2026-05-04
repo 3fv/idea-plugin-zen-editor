@@ -9,18 +9,17 @@ plugins {
 group = "org.threeform.idea.plugins"
 
 val pluginVersion: String = run {
-    providers.environmentVariable("PLUGIN_VERSION").orNull
+    val raw = providers.environmentVariable("PLUGIN_VERSION").orNull
         ?.takeIf { it.isNotBlank() }
-        ?.let { return@run it }
+        ?: runCatching {
+            providers.exec {
+                commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v*")
+                isIgnoreExitValue = true
+            }.standardOutput.asText.get().trim()
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: "0.0.0-SNAPSHOT"
 
-    val gitTag = runCatching {
-        providers.exec {
-            commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v*")
-            isIgnoreExitValue = true
-        }.standardOutput.asText.get().trim().removePrefix("v")
-    }.getOrNull().orEmpty()
-
-    gitTag.takeIf { it.isNotBlank() } ?: "0.0.0-SNAPSHOT"
+    raw.removePrefix("v")
 }
 
 version = pluginVersion
