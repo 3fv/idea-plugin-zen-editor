@@ -3,7 +3,7 @@ import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.0"
-    id("org.jetbrains.intellij.platform") version "2.1.0"
+    id("org.jetbrains.intellij.platform") version "2.16.0"
 //    id("org.jetbrains.intellij.platform.module") version "2.1.0"
 }
 
@@ -20,12 +20,11 @@ repositories {
 dependencies {
     intellijPlatform {
         create("IC", "2025.2.2")
-        instrumentationTools()
     }
 }
 
 intellijPlatform {
-    buildSearchableOptions = false
+    buildSearchableOptions = true
 }
 
 tasks {
