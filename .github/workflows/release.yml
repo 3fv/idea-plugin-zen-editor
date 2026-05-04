@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Compute next version
+        id: ver
+        run: |
+          LATEST=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "v0.0.0")
+          NEXT=$(echo "${LATEST#v}" | awk -F. '{$NF+=1; OFS="."; print}')
+          echo "next=v$NEXT" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag & release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag ${{ steps.ver.outputs.next }}
+          git push origin ${{ steps.ver.outputs.next }}
+          gh release create ${{ steps.ver.outputs.next }} --generate-notes
+
+      - name: Build & publish
+        env:
+          PLUGIN_VERSION: ${{ steps.ver.outputs.next }}
+          JB_PLUGIN_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+        run: ./gradlew publishPlugin

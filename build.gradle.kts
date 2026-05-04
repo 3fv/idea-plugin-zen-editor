@@ -8,7 +8,23 @@ plugins {
 }
 
 group = "org.threeform.idea.plugins"
-version = "1.0.4"
+
+val pluginVersion: String = run {
+    providers.environmentVariable("PLUGIN_VERSION").orNull
+        ?.takeIf { it.isNotBlank() }
+        ?.let { return@run it }
+
+    val gitTag = runCatching {
+        providers.exec {
+            commandLine("git", "describe", "--tags", "--abbrev=0", "--match", "v*")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().removePrefix("v")
+    }.getOrNull().orEmpty()
+
+    gitTag.takeIf { it.isNotBlank() } ?: "0.0.0-SNAPSHOT"
+}
+
+version = pluginVersion
 
 repositories {
     mavenCentral()
