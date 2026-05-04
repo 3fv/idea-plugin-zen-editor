@@ -44,5 +44,5 @@ jobs:
       - name: Build & publish
         env:
           PLUGIN_VERSION: ${{ steps.ver.outputs.next }}
-          JB_PLUGIN_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+          JB_PLUGIN_TOKEN: ${{ secrets.JB_PLUGIN_TOKEN }}
         run: ./gradlew publishPlugin
