@@ -7,7 +7,7 @@ on:
 
 concurrency:
   group: release
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   release:
@@ -28,7 +28,7 @@ jobs:
         id: ver
         run: |
           LATEST=$(gh release view --json tagName -q .tagName 2>/dev/null || echo "v0.0.0")
-          NEXT=$(echo "${LATEST#v}" | awk -F. '{$NF+=1; OFS="."; print}')
+          NEXT=$(echo "${LATEST#v}" | awk 'BEGIN{FS=OFS="."} {$NF+=1; print}')
           echo "next=v$NEXT" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
