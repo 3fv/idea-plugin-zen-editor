@@ -4,11 +4,10 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.2.0"
     id("org.jetbrains.intellij.platform") version "2.16.0"
-//    id("org.jetbrains.intellij.platform.module") version "2.1.0"
 }
 
 group = "org.threeform.idea.plugins"
-version = "1.0.4"
+version = property("pluginVersion") as String
 
 repositories {
     mavenCentral()
@@ -32,13 +31,12 @@ tasks {
         pluginVersion.set(project.version.toString())
 
         sinceBuild.set("242")
-        untilBuild.set("")
     }
 
     signPlugin {
         val envVars = System.getenv()
         val secrets = listOf("PRIVATE_KEY_PASSWORD", "PRIVATE_KEY","CERTIFICATE_CHAIN").map { envVars[it] }
-        if (secrets.all { it != null && it.isNotBlank() } ) {
+        if (secrets.all { !it.isNullOrBlank() } ) {
             certificateChain.set(secrets[2])
             privateKey.set(secrets[1])
             password.set(secrets[0])
