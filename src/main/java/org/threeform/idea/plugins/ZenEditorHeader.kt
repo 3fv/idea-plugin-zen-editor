@@ -2,6 +2,9 @@
 
 package org.threeform.idea.plugins
 
+import com.intellij.ide.ui.UISettings
+import com.intellij.ide.ui.UISettingsListener
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.MessageBusConnection
@@ -13,6 +16,7 @@ import java.awt.Graphics
 import java.awt.Font
 import javax.swing.JLabel
 import javax.swing.JPanel
+import kotlin.math.roundToInt
 
 class ZenEditorHeader(
     val myProject: Project,
@@ -40,6 +44,8 @@ class ZenEditorHeader(
     private val ellipsisLabel: JLabel = JBLabel("...")
 
     private var busConnection: MessageBusConnection? = null
+    private var appBusConnection: MessageBusConnection? = null
+    private var currentState: ZenEditorSettings.State = ZenEditorSettings.getInstance().state
 
     init {
         val filePath = try {
@@ -70,11 +76,27 @@ class ZenEditorHeader(
             applySettings(state)
         })
 
+        appBusConnection = ApplicationManager.getApplication().messageBus.connect()
+        appBusConnection?.subscribe(UISettingsListener.TOPIC, UISettingsListener {
+            applySettings(currentState)
+        })
     }
 
+    override fun removeNotify() {
+        super.removeNotify()
+        appBusConnection?.disconnect()
+        appBusConnection = null
+    }
+
+    private fun ideScale(): Float = UISettings.getInstance().fontScale
+
     private fun applySettings(state: ZenEditorSettings.State) {
+        currentState = state
+        val scale = ideScale()
+        val scaledSize = (state.fontSize * scale).roundToInt()
+            .coerceIn(ZenEditorSettings.MIN_FONT_SIZE, ZenEditorSettings.MAX_FONT_SIZE)
         val baseFont = try {
-            Font(state.fontFamily, Font.PLAIN, state.fontSize)
+            Font(state.fontFamily, Font.PLAIN, scaledSize)
         } catch (e: Exception) {
             font
         }
@@ -86,10 +108,11 @@ class ZenEditorHeader(
 
     override fun getPreferredSize(): Dimension {
         val s = super.getPreferredSize()
-        val h = ZenEditorSettings.getInstance().state.headerHeight.coerceIn(
+        val base = ZenEditorSettings.getInstance().state.headerHeight.coerceIn(
             ZenEditorSettings.MIN_HEIGHT,
             ZenEditorSettings.MAX_HEIGHT
         )
+        val h = (base * ideScale()).roundToInt()
         return Dimension(s.width, h)
     }
 

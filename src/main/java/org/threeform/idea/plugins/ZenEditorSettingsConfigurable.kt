@@ -28,7 +28,7 @@ class ZenEditorSettingsConfigurable : Configurable {
                 anchor = GridBagConstraints.NORTHWEST
             }
 
-            val heightLabel = JLabel("Header height (px):")
+            val heightLabel = JLabel("Header height (base px, scales with IDE zoom):")
             panel!!.add(heightLabel, c)
 
             c.gridy++
@@ -49,7 +49,7 @@ class ZenEditorSettingsConfigurable : Configurable {
             panel!!.add(fontCombo, c)
 
             c.gridy++
-            panel!!.add(JLabel("Font size:"), c)
+            panel!!.add(JLabel("Font size (base pt, scales with IDE zoom):"), c)
 
             c.gridy++
             fontSizeSpinner = JSpinner(SpinnerNumberModel(12, ZenEditorSettings.MIN_FONT_SIZE, ZenEditorSettings.MAX_FONT_SIZE, 1))

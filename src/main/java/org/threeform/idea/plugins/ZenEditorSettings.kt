@@ -17,7 +17,8 @@ class ZenEditorSettings : PersistentStateComponent<ZenEditorSettings.State> {
     data class State(
         var headerHeight: Int = 80,
         var fontFamily: String = defaultFont().family,
-        var fontSize: Int = defaultFont().size
+        var fontSize: Int = defaultFont().size,
+        var zenModeEnabled: Boolean = true
     )
 
     private var myState: State = State()
