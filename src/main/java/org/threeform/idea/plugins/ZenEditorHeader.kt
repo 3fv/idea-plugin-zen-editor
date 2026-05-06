@@ -14,6 +14,7 @@ import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Font
+import javax.swing.Icon
 import javax.swing.JLabel
 import javax.swing.JPanel
 import kotlin.math.roundToInt
@@ -27,6 +28,11 @@ class ZenEditorHeader(
      * Logger
      */
     private val log = thisLogger()
+
+    /**
+     * File-type icon shown to the left of the filename
+     */
+    private val iconLabel: JBLabel
 
     /**
      * Just the filename
@@ -59,6 +65,13 @@ class ZenEditorHeader(
         if (projectPath != null && filePathStr.startsWith(projectPath)) {
             filePathStr = filePathStr.substring(projectPath.length + 1)
         }
+
+        val fileIcon: Icon? = try {
+            myFile.fileType.icon
+        } catch (e: Exception) {
+            null
+        }
+        iconLabel = JBLabel().apply { fileIcon?.let { icon = it } }
 
         filenameLabel = JBLabel(myFile.name)
 
@@ -100,8 +113,8 @@ class ZenEditorHeader(
         } catch (e: Exception) {
             font
         }
-        filenameLabel.font = baseFont.deriveFont((baseFont.size + 2).toFloat())
-        pathLabel.font = baseFont
+        filenameLabel.font = baseFont.deriveFont(Font.BOLD, (baseFont.size + 5).toFloat())
+        pathLabel.font = baseFont.deriveFont((baseFont.size - 1).coerceAtLeast(8).toFloat())
         revalidate()
         repaint()
     }
@@ -123,24 +136,6 @@ class ZenEditorHeader(
     }
 
     /**
-     * Filename width
-     */
-    private val preferredFilenameWidth: Int
-        get() = filenameLabel.preferredSize.width
-
-    /**
-     * The width required to show the complete relative path
-     */
-    private val preferredPathWidth: Int
-        get() = pathLabel.preferredSize.width
-
-    /**
-     * All padding (left + middle + center)
-     */
-    private val totalPadding: Int
-        get() = (PADDING_WIDTH * 3)
-
-    /**
      * Width of the panel used to contain
      * content and enable fitment
      */
@@ -148,52 +143,63 @@ class ZenEditorHeader(
         get() = size.width
 
     /**
-     * Width of filename label (same as preferred for the moment)
+     * Spacing scales with the filename font so the visual
+     * rhythm holds across user-configured font sizes.
      */
+    private val filenameFontSize: Int
+        get() = filenameLabel.font.size
+
+    /** Outer left/right padding — gives the banner real edge breathing room. */
+    private val edgePadding: Int
+        get() = filenameFontSize.coerceAtLeast(12)
+
+    /** Gap between the file icon and the filename. */
+    private val iconGap: Int
+        get() = (filenameFontSize * 0.5f).roundToInt().coerceAtLeast(6)
+
+    /** Gap between the filename and the relative path. */
+    private val elementGap: Int
+        get() = filenameFontSize.coerceAtLeast(10)
+
+    private val iconWidth: Int
+        get() = iconLabel.icon?.iconWidth ?: 0
+
+    private val iconHeight: Int
+        get() = iconLabel.icon?.iconHeight ?: 0
+
     private val filenameWidth: Int
-        get() = preferredFilenameWidth
+        get() = filenameLabel.preferredSize.width
 
-    /**
-     * Ideal content width to avoid shortening the path
-     */
-    private val preferredContentWidth: Int
-        get() = filenameWidth + preferredPathWidth + totalPadding
+    private val preferredPathWidth: Int
+        get() = pathLabel.preferredSize.width
 
-    /**
-     * Only used as a measurement
-     */
     private val ellipsisWidth: Int
         get() = ellipsisLabel.preferredSize.width
 
-    /**
-     * Actual path width
-     */
+    /** Width before the path: edge + icon + iconGap + filename + elementGap. */
+    private val staticLeadingWidth: Int
+        get() = edgePadding + iconWidth + (if (iconWidth > 0) iconGap else 0) +
+            filenameWidth + elementGap
+
+    /** Full preferred container width (icon + gaps + labels + edges). */
+    private val preferredContentWidth: Int
+        get() = staticLeadingWidth + preferredPathWidth + edgePadding
+
+    /** Path width — shrinks with available space, never below the ellipsis. */
     private val pathWidth: Int
         get() {
-            if (preferredContentWidth <= availableWidth) {
-                return preferredPathWidth
-            }
-            val staticWidth = filenameWidth + totalPadding
-            return (availableWidth - staticWidth).coerceAtLeast(ellipsisWidth)
+            if (preferredContentWidth <= availableWidth) return preferredPathWidth
+            return (availableWidth - staticLeadingWidth - edgePadding)
+                .coerceAtLeast(ellipsisWidth)
         }
 
-    /**
-     * Actual content width
-     */
-    private val contentWidth: Int
-        get() = filenameWidth + pathWidth + totalPadding
-
-    /**
-     * Whether to truncate the path label
-     */
     private val shouldTruncatePath: Boolean
         get() = preferredContentWidth > availableWidth
 
     /**
-     * Overridden paint allows for us to
-     * check the calculated size of the path
-     * label & adjust the content via ellipsis
-     * if needed
+     * Overridden paint draws icon → filename → path with vertical
+     * centering done independently per element so the bold filename and
+     * the smaller path align cleanly regardless of size.
      */
     override fun paint(g: Graphics) {
         super.paint(g)
@@ -201,48 +207,55 @@ class ZenEditorHeader(
         if (log.isDebugEnabled)
             log.debug("Painting zen_editor header, size=${this.size}")
 
-        val shouldTruncatePath = this.shouldTruncatePath
-        val contentWidth = this.contentWidth
+        val shouldTruncate = shouldTruncatePath
         val pathLabelHeight = pathLabel.preferredSize.height
+        val filenameLabelHeight = filenameLabel.preferredSize.height
 
-        // DETERMINE START COORDINATE
-        val startOffsetX = if (shouldTruncatePath) {
-            PADDING_WIDTH
-        } else {
-            val middleX = size.width / 2
-            val startX = middleX - (contentWidth / 2)
-            if (log.isDebugEnabled)
-                log.debug("Centering header: width=${size.width}, middleX=$middleX, startX=$startX, contentWidth=$contentWidth")
-            startX
+        // Inner content width (no edge padding) — used for non-left alignments.
+        val innerContentWidth = staticLeadingWidth - edgePadding +
+            (if (shouldTruncate) pathWidth else preferredPathWidth)
+
+        val startX = when {
+            // When content can't fit fully, alignment is moot — pin to the left.
+            shouldTruncate -> edgePadding
+            else -> when (currentState.headerAlignment) {
+                HeaderAlignment.LEFT -> edgePadding
+                HeaderAlignment.CENTER ->
+                    ((size.width - innerContentWidth) / 2).coerceAtLeast(edgePadding)
+                HeaderAlignment.RIGHT ->
+                    (size.width - innerContentWidth - edgePadding).coerceAtLeast(edgePadding)
+            }
         }
 
+        var x = startX
 
-        val startOffsetY = (size.height - pathLabelHeight) / 2
-
-        // TRANSLATE TO START COORDINATE & PAINT
-        g.translate(startOffsetX, startOffsetY)
-        filenameLabel.size = filenameLabel.preferredSize
-        filenameLabel.paint(g)
-
-        // MOVE INTO POSITION TO DRAW THE PATH LABEL
-        g.translate(filenameWidth + PADDING_WIDTH, 2)
-
-        // SET THE CORRECT SIZE FOR THE PATH LABEL
-        pathLabel.size = if (!shouldTruncatePath) {
-             pathLabel.preferredSize
-        } else {
-            val endOffset = pathWidth - 1
-            Dimension(endOffset, pathLabelHeight)
-
+        // ICON — vertically centered on the panel
+        if (iconWidth > 0) {
+            val iconY = (size.height - iconHeight) / 2
+            iconLabel.icon?.paintIcon(this, g, x, iconY)
+            x += iconWidth + iconGap
         }
 
-        pathLabel.paint(g)
-    }
+        // FILENAME — vertically centered on the panel
+        val filenameY = (size.height - filenameLabelHeight) / 2
+        val gFilename = g.create(x, filenameY, filenameWidth, filenameLabelHeight)
+        try {
+            filenameLabel.size = filenameLabel.preferredSize
+            filenameLabel.paint(gFilename)
+        } finally {
+            gFilename.dispose()
+        }
+        x += filenameWidth + elementGap
 
-    companion object {
-        /**
-         * Before / middle / end padding width
-         */
-        private const val PADDING_WIDTH = 5
+        // PATH — vertically centered, truncated by clipping when needed
+        val pathPaintWidth = if (shouldTruncate) pathWidth - 1 else preferredPathWidth
+        val pathY = (size.height - pathLabelHeight) / 2
+        val gPath = g.create(x, pathY, pathPaintWidth, pathLabelHeight)
+        try {
+            pathLabel.size = Dimension(pathPaintWidth, pathLabelHeight)
+            pathLabel.paint(gPath)
+        } finally {
+            gPath.dispose()
+        }
     }
 }

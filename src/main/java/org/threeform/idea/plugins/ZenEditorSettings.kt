@@ -18,7 +18,8 @@ class ZenEditorSettings : PersistentStateComponent<ZenEditorSettings.State> {
         var headerHeight: Int = 80,
         var fontFamily: String = defaultFont().family,
         var fontSize: Int = defaultFont().size,
-        var zenModeEnabled: Boolean = true
+        var zenModeEnabled: Boolean = true,
+        var headerAlignment: HeaderAlignment = HeaderAlignment.LEFT
     )
 
     private var myState: State = State()
@@ -60,6 +61,14 @@ class ZenEditorSettings : PersistentStateComponent<ZenEditorSettings.State> {
             return f ?: Font("Dialog", Font.PLAIN, 12)
         }
     }
+}
+
+enum class HeaderAlignment(val displayName: String) {
+    LEFT("Left"),
+    CENTER("Center"),
+    RIGHT("Right");
+
+    override fun toString(): String = displayName
 }
 
 fun interface ZenSettingsListener {

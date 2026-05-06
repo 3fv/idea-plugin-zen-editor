@@ -12,6 +12,7 @@ class ZenEditorSettingsConfigurable : Configurable {
     private lateinit var heightSlider: JSlider
     private lateinit var fontCombo: JComboBox<String>
     private lateinit var fontSizeSpinner: JSpinner
+    private lateinit var alignmentCombo: JComboBox<HeaderAlignment>
 
     override fun getDisplayName(): String = "Zen Editor"
 
@@ -55,6 +56,13 @@ class ZenEditorSettingsConfigurable : Configurable {
             fontSizeSpinner = JSpinner(SpinnerNumberModel(12, ZenEditorSettings.MIN_FONT_SIZE, ZenEditorSettings.MAX_FONT_SIZE, 1))
             panel!!.add(fontSizeSpinner, c)
 
+            c.gridy++
+            panel!!.add(JLabel("Header alignment:"), c)
+
+            c.gridy++
+            alignmentCombo = JComboBox(HeaderAlignment.values())
+            panel!!.add(alignmentCombo, c)
+
             reset()
         }
         return panel as JPanel
@@ -64,15 +72,18 @@ class ZenEditorSettingsConfigurable : Configurable {
         val s = ZenEditorSettings.getInstance().state
         return heightSlider.value != s.headerHeight ||
                 fontCombo.selectedItem != s.fontFamily ||
-                (fontSizeSpinner.value as Int) != s.fontSize
+                (fontSizeSpinner.value as Int) != s.fontSize ||
+                alignmentCombo.selectedItem != s.headerAlignment
     }
 
     override fun apply() {
         val settings = ZenEditorSettings.getInstance()
-        val newState = ZenEditorSettings.State(
+        val current = settings.state
+        val newState = current.copy(
             headerHeight = heightSlider.value,
             fontFamily = fontCombo.selectedItem as String,
-            fontSize = fontSizeSpinner.value as Int
+            fontSize = fontSizeSpinner.value as Int,
+            headerAlignment = alignmentCombo.selectedItem as HeaderAlignment
         )
         settings.setAndNotify(newState)
     }
@@ -82,5 +93,6 @@ class ZenEditorSettingsConfigurable : Configurable {
         heightSlider.value = s.headerHeight
         fontCombo.selectedItem = s.fontFamily
         fontSizeSpinner.value = s.fontSize
+        alignmentCombo.selectedItem = s.headerAlignment
     }
 }
