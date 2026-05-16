@@ -1,7 +1,11 @@
 package org.threeform.idea.plugins
 
 import com.intellij.openapi.options.Configurable
+import com.intellij.ui.ColorPanel
 import javax.swing.*
+import java.awt.Color
+import java.awt.FlowLayout
+import java.awt.Font
 import java.awt.GraphicsEnvironment
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
@@ -13,6 +17,12 @@ class ZenEditorSettingsConfigurable : Configurable {
     private lateinit var fontCombo: JComboBox<String>
     private lateinit var fontSizeSpinner: JSpinner
     private lateinit var alignmentCombo: JComboBox<HeaderAlignment>
+    private lateinit var filenameColorCheck: JCheckBox
+    private lateinit var filenameColorPanel: ColorPanel
+    private lateinit var relativePathColorCheck: JCheckBox
+    private lateinit var relativePathColorPanel: ColorPanel
+    private lateinit var absolutePathColorCheck: JCheckBox
+    private lateinit var absolutePathColorPanel: ColorPanel
 
     override fun getDisplayName(): String = "Zen Editor"
 
@@ -63,9 +73,40 @@ class ZenEditorSettingsConfigurable : Configurable {
             alignmentCombo = JComboBox(HeaderAlignment.values())
             panel!!.add(alignmentCombo, c)
 
+            c.gridy++
+            panel!!.add(Box.createVerticalStrut(8), c)
+
+            c.gridy++
+            panel!!.add(JLabel("Color overrides:").apply {
+                font = font.deriveFont(Font.BOLD)
+            }, c)
+
+            filenameColorCheck = JCheckBox("Filename")
+            filenameColorPanel = ColorPanel()
+            c.gridy++
+            panel!!.add(buildColorRow(filenameColorCheck, filenameColorPanel), c)
+
+            relativePathColorCheck = JCheckBox("Relative path")
+            relativePathColorPanel = ColorPanel()
+            c.gridy++
+            panel!!.add(buildColorRow(relativePathColorCheck, relativePathColorPanel), c)
+
+            absolutePathColorCheck = JCheckBox("Absolute path")
+            absolutePathColorPanel = ColorPanel()
+            c.gridy++
+            panel!!.add(buildColorRow(absolutePathColorCheck, absolutePathColorPanel), c)
+
             reset()
         }
         return panel as JPanel
+    }
+
+    private fun buildColorRow(check: JCheckBox, colorPanel: ColorPanel): JPanel {
+        val row = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0))
+        row.add(check)
+        row.add(colorPanel)
+        check.addActionListener { colorPanel.isEnabled = check.isSelected }
+        return row
     }
 
     override fun isModified(): Boolean {
@@ -73,7 +114,10 @@ class ZenEditorSettingsConfigurable : Configurable {
         return heightSlider.value != s.headerHeight ||
                 fontCombo.selectedItem != s.fontFamily ||
                 (fontSizeSpinner.value as Int) != s.fontSize ||
-                alignmentCombo.selectedItem != s.headerAlignment
+                alignmentCombo.selectedItem != s.headerAlignment ||
+                effectiveOverride(filenameColorCheck, filenameColorPanel) != s.filenameColor ||
+                effectiveOverride(relativePathColorCheck, relativePathColorPanel) != s.relativePathColor ||
+                effectiveOverride(absolutePathColorCheck, absolutePathColorPanel) != s.absolutePathColor
     }
 
     override fun apply() {
@@ -83,7 +127,10 @@ class ZenEditorSettingsConfigurable : Configurable {
             headerHeight = heightSlider.value,
             fontFamily = fontCombo.selectedItem as String,
             fontSize = fontSizeSpinner.value as Int,
-            headerAlignment = alignmentCombo.selectedItem as HeaderAlignment
+            headerAlignment = alignmentCombo.selectedItem as HeaderAlignment,
+            filenameColor = effectiveOverride(filenameColorCheck, filenameColorPanel),
+            relativePathColor = effectiveOverride(relativePathColorCheck, relativePathColorPanel),
+            absolutePathColor = effectiveOverride(absolutePathColorCheck, absolutePathColorPanel)
         )
         settings.setAndNotify(newState)
     }
@@ -94,5 +141,23 @@ class ZenEditorSettingsConfigurable : Configurable {
         fontCombo.selectedItem = s.fontFamily
         fontSizeSpinner.value = s.fontSize
         alignmentCombo.selectedItem = s.headerAlignment
+        loadOverride(filenameColorCheck, filenameColorPanel, s.filenameColor)
+        loadOverride(relativePathColorCheck, relativePathColorPanel, s.relativePathColor)
+        loadOverride(absolutePathColorCheck, absolutePathColorPanel, s.absolutePathColor)
+    }
+
+    private fun effectiveOverride(check: JCheckBox, colorPanel: ColorPanel): String? {
+        if (!check.isSelected) return null
+        val c = colorPanel.selectedColor ?: return null
+        return "#%06X".format(c.rgb and 0xFFFFFF)
+    }
+
+    private fun loadOverride(check: JCheckBox, colorPanel: ColorPanel, value: String?) {
+        val parsed = value?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            try { Color.decode(it) } catch (e: Exception) { null }
+        }
+        check.isSelected = parsed != null
+        colorPanel.selectedColor = parsed
+        colorPanel.isEnabled = check.isSelected
     }
 }

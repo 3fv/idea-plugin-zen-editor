@@ -19,7 +19,16 @@ class ZenEditorSettings : PersistentStateComponent<ZenEditorSettings.State> {
         var fontFamily: String = defaultFont().family,
         var fontSize: Int = defaultFont().size,
         var zenModeEnabled: Boolean = true,
-        var headerAlignment: HeaderAlignment = HeaderAlignment.LEFT
+        var headerAlignment: HeaderAlignment = HeaderAlignment.LEFT,
+        /**
+         * Optional `#RRGGBB` color overrides for the header text components.
+         * Null/blank means "use the built-in default". The path overrides are
+         * applied as the base hue — the relative/absolute alpha overlay is
+         * preserved so visual hierarchy still reads.
+         */
+        var filenameColor: String? = null,
+        var relativePathColor: String? = null,
+        var absolutePathColor: String? = null
     )
 
     private var myState: State = State()

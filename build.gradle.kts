@@ -1,4 +1,5 @@
 import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
+import java.util.Properties
 
 plugins {
     id("java")
@@ -33,19 +34,26 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        create("IC", "2025.2.2")
+        intellijIdea("2025.3.5")
     }
 }
 
 intellijPlatform {
-    buildSearchableOptions = false
+    buildSearchableOptions = true
 }
 
 tasks {
     patchPluginXml {
         pluginVersion.set(project.version.toString())
 
-        sinceBuild.set("242")
+        sinceBuild.set("253")
+    }
+
+    buildSearchableOptions {
+        // Load only this plugin (+ its declared platform deps) so bundled
+        // Grazie doesn't start its GrazieLoginManager, which otherwise blocks
+        // headless shutdown for 10s on a JBA auth call.
+        systemProperty("idea.required.plugins.id", "org.threeform.idea.plugins.zen_editor")
     }
 
     signPlugin {
