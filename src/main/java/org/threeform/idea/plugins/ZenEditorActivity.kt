@@ -1,9 +1,11 @@
 package org.threeform.idea.plugins
 
+import com.intellij.openapi.application.ApplicationActivationListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
@@ -13,10 +15,12 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.vfs.newvfs.events.VFilePropertyChangeEvent
+import com.intellij.openapi.wm.IdeFrame
 import com.intellij.ui.tabs.JBTabs
 import java.awt.Component
 import java.util.*
 import javax.swing.JComponent
+import javax.swing.Timer
 
 
 /**
@@ -49,6 +53,19 @@ class ZenEditorActivity : ProjectActivity {
     private val activeEditors =
         Collections.synchronizedMap(IdentityHashMap<JComponent, Pair<Project, ZenEditorInstall>>())
 
+    /**
+     * JBTabs widgets that the watchdog should keep hidden. The IDE
+     * sometimes resets `isHideTabs` back to `false` (e.g., on focus
+     * change or internal relayout). `JBTabsImpl.setHideTabs` does NOT
+     * fire a PropertyChange event, so we cannot listen — we poll
+     * instead (see [watchdogTimer]).
+     */
+    private val watchedTabs: MutableSet<JBTabs> =
+        Collections.synchronizedSet(Collections.newSetFromMap(IdentityHashMap<JBTabs, Boolean>()))
+
+    /** EDT timer that re-enforces `isHideTabs = true` on every tracked widget. */
+    private var watchdogTimer: Timer? = null
+
     init {
         // GET CONNECTION TO MESSAGE BUS
         val connect = ApplicationManager.getApplication().messageBus.connect()
@@ -61,6 +78,22 @@ class ZenEditorActivity : ProjectActivity {
 
             override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
                 reconcile(source.project)
+            }
+
+            override fun selectionChanged(event: FileEditorManagerEvent) {
+                // Focus / tab switch is a common trigger for the IDE to
+                // flip isHideTabs back on. Re-enforce immediately.
+                reapplyTabVisibility(event.manager.project)
+            }
+        })
+
+        // ADD APP ACTIVATION LISTENER — IDE regaining window focus is
+        // another known trigger for the tab strip to reappear.
+        connect.subscribe(ApplicationActivationListener.TOPIC, object : ApplicationActivationListener {
+            override fun applicationActivated(ideFrame: IdeFrame) {
+                ProjectManager.getInstance().openProjects.forEach { p ->
+                    if (!p.isDisposed) reapplyTabVisibility(p)
+                }
             }
         })
 
@@ -150,10 +183,84 @@ class ZenEditorActivity : ProjectActivity {
             val tabs = findEnclosingTabs(editor.component) ?: return@forEach
             if (seen.add(tabs)) {
                 try {
-                    tabs.presentation.isHideTabs = hide
+                    if (tabs.presentation.isHideTabs != hide) {
+                        tabs.presentation.isHideTabs = hide
+                    }
                 } catch (t: Throwable) {
                     log.warn("Failed to toggle JBTabs.isHideTabs", t)
                 }
+                if (hide) watchedTabs.add(tabs) else watchedTabs.remove(tabs)
+            }
+        }
+        if (hide && watchedTabs.isNotEmpty()) {
+            ensureWatchdogRunning()
+        } else if (!hide && watchedTabs.isEmpty()) {
+            stopWatchdog()
+        }
+    }
+
+    /**
+     * Re-enforce `isHideTabs = true` for every editor in [project]
+     * whenever a known reveal-trigger fires (selection/focus change,
+     * window activation). No-op when zen mode is disabled.
+     */
+    private fun reapplyTabVisibility(project: Project) {
+        if (!ZenEditorSettings.getInstance().state.zenModeEnabled) return
+        if (project.isDisposed) return
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            if (!ZenEditorSettings.getInstance().state.zenModeEnabled) return@invokeLater
+            val editors = FileEditorManager.getInstance(project).allEditors.toList()
+            applyTabVisibility(editors, hide = true)
+        }
+    }
+
+    private fun ensureWatchdogRunning() {
+        ApplicationManager.getApplication().invokeLater {
+            if (watchdogTimer?.isRunning == true) return@invokeLater
+            if (!ZenEditorSettings.getInstance().state.zenModeEnabled) return@invokeLater
+            val timer = Timer(WATCHDOG_INTERVAL_MS) { pollAndReapply() }
+            timer.isRepeats = true
+            timer.start()
+            watchdogTimer = timer
+        }
+    }
+
+    private fun stopWatchdog() {
+        ApplicationManager.getApplication().invokeLater {
+            watchdogTimer?.stop()
+            watchdogTimer = null
+        }
+    }
+
+    /**
+     * Watchdog tick — fires on the EDT. Iterates [watchedTabs], evicts
+     * widgets that have been detached (project closed, editor disposed),
+     * and forces `isHideTabs = true` on any survivor whose flag was
+     * flipped back by the IDE.
+     */
+    private fun pollAndReapply() {
+        if (!ZenEditorSettings.getInstance().state.zenModeEnabled) {
+            stopWatchdog()
+            return
+        }
+        val snapshot = synchronized(watchedTabs) { watchedTabs.toList() }
+        if (snapshot.isEmpty()) {
+            stopWatchdog()
+            return
+        }
+        snapshot.forEach { tabs ->
+            val comp = tabs as? JComponent
+            if (comp == null || comp.parent == null || !comp.isDisplayable) {
+                watchedTabs.remove(tabs)
+                return@forEach
+            }
+            try {
+                if (!tabs.presentation.isHideTabs) {
+                    tabs.presentation.isHideTabs = true
+                }
+            } catch (t: Throwable) {
+                log.warn("Watchdog re-hide failed", t)
             }
         }
     }
@@ -208,5 +315,6 @@ class ZenEditorActivity : ProjectActivity {
 
     companion object {
         private val log = Logger.getInstance(ZenEditorInstall::class.java)
+        private const val WATCHDOG_INTERVAL_MS = 500
     }
 }

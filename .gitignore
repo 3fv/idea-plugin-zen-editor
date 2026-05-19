@@ -1505,3 +1505,4 @@ gradle-app.setting
 /.intellijPlatform/sandbox/zen_editor/IC-2025.2.2/system/.pid
 /.intellijPlatform/sandbox/zen_editor/IC-2025.2.2/system/icon-cache-v1.db
 /.intellijPlatform/coroutines-javaagent.jar
+/.ai/mcp/mcp.json
