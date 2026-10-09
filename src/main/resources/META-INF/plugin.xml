@@ -16,6 +16,17 @@
     ]]></description>
 
     <change-notes><![CDATA[
+      <h4>v1.1.6: Headers for non-file editors</h4>
+      <ul>
+        <li>Editors without an on-disk file (e.g. AI agent sessions) show their real,
+          untruncated title instead of an internal name like <code>threadView-…</code>,
+          and follow later title changes</li>
+        <li>Path lines are hidden for editors without a file path (no more
+          <code>NOT_AVAILABLE</code>)</li>
+        <li>The header title fills the available width and is ellipsized only when
+          it does not fit</li>
+      </ul>
+      <br/><br/>
       <h4>v1.0.1: A few changes/fixes</h4>
       <ul>
         <li>Created a custom component to facilitate content measurement</li>

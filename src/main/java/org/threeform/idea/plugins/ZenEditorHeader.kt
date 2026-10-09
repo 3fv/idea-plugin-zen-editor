@@ -6,6 +6,7 @@ import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.UISettingsListener
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.fileEditor.impl.EditorTabPresentationUtil
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.Balloon
@@ -13,8 +14,11 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.tabs.JBTabs
+import com.intellij.ui.tabs.TabInfo
 import com.intellij.util.messages.MessageBusConnection
 import java.awt.Color
+import java.awt.Component
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.Font
@@ -24,11 +28,13 @@ import java.awt.Rectangle
 import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.beans.PropertyChangeListener
 import javax.swing.Icon
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.ToolTipManager
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 class ZenEditorHeader(
@@ -76,6 +82,12 @@ class ZenEditorHeader(
     private val defaultFilenameForeground: Color
 
     /**
+     * False when the file has no on-disk path (non-file editors such as an
+     * AI agent thread view) — the path column is not rendered at all.
+     */
+    private val showPaths: Boolean
+
+    /**
      * False when the file lives outside the project root (or path lookup
      * failed) and the two strings would render identically.
      */
@@ -89,22 +101,31 @@ class ZenEditorHeader(
     private var appBusConnection: MessageBusConnection? = null
     private var currentState: ZenEditorSettings.State = ZenEditorSettings.getInstance().state
 
+    /** Tab whose title this header mirrors (non-file editors only); bound while displayed. */
+    private var boundTab: TabInfo? = null
+    private val tabTitleListener = PropertyChangeListener {
+        ApplicationManager.getApplication().invokeLater {
+            boundTab?.let { setTitle(resolveTitle(it.text)) }
+        }
+    }
+
     init {
         val absPath = try {
             myFile.toNioPath().toAbsolutePath().toString().replace('\\', '/')
         } catch (e: Exception) {
-            "NOT_AVAILABLE"
+            null
         }
-        absolutePathStr = absPath
+        showPaths = absPath != null
+        absolutePathStr = absPath ?: ""
 
         val projectPath = myProject.basePath
-        relativePathStr = if (projectPath != null && absPath.startsWith(projectPath)) {
+        relativePathStr = if (absPath != null && projectPath != null && absPath.startsWith(projectPath)) {
             absPath.substring(projectPath.length + 1)
         } else {
-            absPath
+            absolutePathStr
         }
 
-        showAbsolutePath = relativePathStr != absolutePathStr
+        showAbsolutePath = showPaths && relativePathStr != absolutePathStr
 
         val fileIcon: Icon? = try {
             myFile.fileType.icon
@@ -113,7 +134,7 @@ class ZenEditorHeader(
         }
         iconLabel = JBLabel().apply { fileIcon?.let { icon = it } }
 
-        filenameLabel = JBLabel(myFile.name)
+        filenameLabel = JBLabel(resolveTitle(null))
         defaultFilenameForeground = filenameLabel.foreground
 
         pathLabel = JBLabel(relativePathStr)
@@ -181,10 +202,80 @@ class ZenEditorHeader(
             .show(origin, Balloon.Position.below)
     }
 
+    /**
+     * Regular on-disk files show their filename. Non-file editors (e.g. an AI
+     * agent thread view) back onto a light file with an internal name like
+     * `threadView-…`; their title comes from, in order:
+     *  1. a public `getThreadTitle()` on the file — the agent plugin's full,
+     *     untruncated session title (its tab title is capped at 32 chars);
+     *     looked up reflectively so there is no compile-time dependency
+     *  2. [tabText], the live text of the enclosing editor tab
+     *  3. `EditorTabTitleProvider`, i.e. what the tab would show
+     *  4. the file's presentable name
+     * The header itself ellipsizes to the available width.
+     */
+    private fun resolveTitle(tabText: String?): String {
+        if (myFile.isInLocalFileSystem) return myFile.name
+        fullTitle()?.let { return it }
+        tabText?.takeIf { it.isNotBlank() }?.let { return it }
+        val providerTitle = try {
+            EditorTabPresentationUtil.getEditorTabTitle(myProject, myFile)
+        } catch (e: Exception) {
+            log.warn("Failed to resolve editor tab title for ${myFile.name}", e)
+            null
+        }
+        return providerTitle?.takeIf { it.isNotBlank() } ?: myFile.presentableName
+    }
+
+    private fun fullTitle(): String? = try {
+        (myFile.javaClass.getMethod("getThreadTitle").invoke(myFile) as? String)
+            ?.replace(WHITESPACE_RUN, " ")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    } catch (e: ReflectiveOperationException) {
+        null
+    }
+
+    private fun setTitle(title: String) {
+        if (title.isBlank() || title == filenameLabel.text) return
+        filenameLabel.text = title
+        revalidate()
+        repaint()
+    }
+
+    override fun addNotify() {
+        super.addNotify()
+        if (!myFile.isInLocalFileSystem) bindTabTitle()
+    }
+
     override fun removeNotify() {
         super.removeNotify()
+        unbindTabTitle()
         appBusConnection?.disconnect()
         appBusConnection = null
+    }
+
+    /**
+     * Mirror the enclosing tab's text. Non-file editor titles are often
+     * resolved asynchronously or change later (a session gets named after
+     * its first prompt), and the tab is the one place the IDE keeps current.
+     * The tab strip is hidden in zen mode, but its `TabInfo` stays live.
+     */
+    private fun bindTabTitle() {
+        unbindTabTitle()
+        val ancestors = generateSequence<Component>(this) { it.parent }.toList()
+        val tabsIndex = ancestors.indexOfFirst { it is JBTabs }
+        if (tabsIndex < 0) return
+        val tabs = ancestors[tabsIndex] as JBTabs
+        val info = ancestors.subList(0, tabsIndex).firstNotNullOfOrNull { tabs.findInfo(it) } ?: return
+        info.changeSupport.addPropertyChangeListener(TabInfo.TEXT, tabTitleListener)
+        boundTab = info
+        setTitle(resolveTitle(info.text))
+    }
+
+    private fun unbindTabTitle() {
+        boundTab?.changeSupport?.removePropertyChangeListener(TabInfo.TEXT, tabTitleListener)
+        boundTab = null
     }
 
     private fun ideScale(): Float = UISettings.getInstance().fontScale
@@ -279,6 +370,23 @@ class ZenEditorHeader(
     private val filenameWidth: Int
         get() = filenameLabel.preferredSize.width
 
+    /** Width before the filename: edge + icon + iconGap. */
+    private val leadingWidth: Int
+        get() = edgePadding + iconWidth + (if (iconWidth > 0) iconGap else 0)
+
+    /**
+     * Filename width actually painted — the preferred width, shrunk (and
+     * ellipsized by the label) only once the path column is already down to
+     * its ellipsis, or when there is no path column and the title alone
+     * overflows.
+     */
+    private val filenamePaintWidth: Int
+        get() {
+            val reserved = leadingWidth + edgePadding +
+                (if (showPaths) elementGap + ellipsisWidth else 0)
+            return min(filenameWidth, (availableWidth - reserved).coerceAtLeast(ellipsisWidth))
+        }
+
     private val preferredRelativePathWidth: Int
         get() = pathLabel.preferredSize.width
 
@@ -294,12 +402,12 @@ class ZenEditorHeader(
 
     /** Width before the path column: edge + icon + iconGap + filename + elementGap. */
     private val staticLeadingWidth: Int
-        get() = edgePadding + iconWidth + (if (iconWidth > 0) iconGap else 0) +
-            filenameWidth + elementGap
+        get() = leadingWidth + filenamePaintWidth + (if (showPaths) elementGap else 0)
 
     /** Full preferred container width (icon + gaps + labels + edges). */
     private val preferredContentWidth: Int
-        get() = staticLeadingWidth + preferredPathColumnWidth + edgePadding
+        get() = leadingWidth + filenameWidth +
+            (if (showPaths) elementGap + preferredPathColumnWidth else 0) + edgePadding
 
     /** Path column width — shrinks with available space, never below the ellipsis. */
     private val pathColumnWidth: Int
@@ -331,7 +439,11 @@ class ZenEditorHeader(
         val absPathLabelHeight = if (showAbsolutePath) absPathLabel.preferredSize.height else 0
         val filenameLabelHeight = filenameLabel.preferredSize.height
 
-        val pathColumn = if (shouldTruncate) pathColumnWidth else preferredPathColumnWidth
+        val pathColumn = when {
+            !showPaths -> 0
+            shouldTruncate -> pathColumnWidth
+            else -> preferredPathColumnWidth
+        }
 
         // Inner content width (no edge padding) — used for non-left alignments.
         val innerContentWidth = staticLeadingWidth - edgePadding + pathColumn
@@ -359,14 +471,21 @@ class ZenEditorHeader(
 
         // FILENAME — vertically centered on the panel
         val filenameY = (size.height - filenameLabelHeight) / 2
-        val gFilename = g.create(x, filenameY, filenameWidth, filenameLabelHeight)
+        val filenamePaint = filenamePaintWidth
+        val gFilename = g.create(x, filenameY, filenamePaint, filenameLabelHeight)
         try {
-            filenameLabel.size = filenameLabel.preferredSize
+            filenameLabel.size = Dimension(filenamePaint, filenameLabelHeight)
             filenameLabel.paint(gFilename)
         } finally {
             gFilename.dispose()
         }
-        x += filenameWidth + elementGap
+        x += filenamePaint + elementGap
+
+        if (!showPaths) {
+            relativePathBounds.setBounds(0, 0, 0, 0)
+            absolutePathBounds.setBounds(0, 0, 0, 0)
+            return
+        }
 
         // PATH STACK — relative path above absolute path, the pair centered vertically
         val stackGap = if (showAbsolutePath) (pathLabelHeight * 0.1f).roundToInt() else 0
@@ -409,5 +528,6 @@ class ZenEditorHeader(
             Color(0x61, 0xAF, 0xEF, (255 * RELATIVE_PATH_ALPHA).roundToInt())
         private val DEFAULT_ABSOLUTE_PATH_COLOR =
             Color(0x61, 0xAF, 0xEF, (255 * ABSOLUTE_PATH_ALPHA).roundToInt())
+        private val WHITESPACE_RUN = Regex("\\s+")
     }
 }
