@@ -18,7 +18,7 @@ There is no `src/test`; if tests are added, `./gradlew test --tests '<FQN>'` run
 
 ## Build facts
 
-- Targets IntelliJ IDEA `2025.3.5`, `sinceBuild = 253` (no `untilBuild`). JDK 21 (CI uses Temurin 21).
+- Targets IntelliJ IDEA `2026.3`, `sinceBuild = 253` (no `untilBuild`). JDK 25 (CI uses Temurin 25); Kotlin/JVM bytecode target remains 17.
 - Version is derived, never hard-coded: `PLUGIN_VERSION` env var → latest `v*` git tag → `0.0.0-SNAPSHOT`, with the `v` prefix stripped.
 - `buildSearchableOptions` sets `idea.required.plugins.id` to this plugin's id so bundled Grazie doesn't load and hang headless shutdown on a JetBrains Account auth call. Keep it if touching that task.
 - Gradle configuration cache and build cache are enabled (`gradle.properties`); build-script logic must stay configuration-cache compatible (use `providers.*`, not eager `exec`).

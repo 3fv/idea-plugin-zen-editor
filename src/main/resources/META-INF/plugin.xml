@@ -16,6 +16,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+      <h4>IDEA 2026.3 compatibility</h4>
+      <ul>
+        <li>Updated the plugin's target platform to IntelliJ IDEA 2026.3</li>
+      </ul>
+      <br/><br/>
       <h4>v1.1.6: Headers for non-file editors</h4>
       <ul>
         <li>Editors without an on-disk file (e.g. AI agent sessions) show their real,

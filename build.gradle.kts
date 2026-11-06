@@ -3,8 +3,8 @@ import java.util.Properties
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.2.0"
-    id("org.jetbrains.intellij.platform") version "2.16.0"
+    id("org.jetbrains.kotlin.jvm") version "2.4.21"
+    id("org.jetbrains.intellij.platform") version "2.20.0"
 }
 
 group = "org.threeform.idea.plugins"
@@ -32,14 +32,29 @@ repositories {
     }
 }
 
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
 dependencies {
     intellijPlatform {
-        intellijIdea("2025.3.5")
+        intellijIdea("2026.3")
     }
 }
 
 intellijPlatform {
     buildSearchableOptions = true
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
 }
 
 tasks {

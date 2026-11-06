@@ -22,7 +22,7 @@ These guidelines tell Junie how to build, run, test, and validate changes, and s
 
 ## Build and run
 Prerequisites:
-- JDK 21 available to Gradle (sourceCompatibility 21; Kotlin/JVM target 17)
+- JDK 25 available to Gradle (required by IntelliJ IDEA 2026.3; Kotlin/JVM target 17)
 - Internet access for Gradle dependencies
 
 Common tasks:
@@ -31,9 +31,9 @@ Common tasks:
 - Assemble only: ./gradlew jar
 
 Key build settings (from build.gradle.kts):
-- IntelliJ Platform: IC 2025.2
-- sinceBuild: 242, untilBuild: 253.*
-- Kotlin: 2.2.0; Kotlin JVM target: 17
+- IntelliJ Platform: IC 2026.3
+- sinceBuild: 253; no `untilBuild` (supports 2026.3 and later)
+- Kotlin: 2.4.21; Kotlin JVM target: 17
 - Custom task copy_jar copies the built jar into the runIde sandbox plugin folder
 
 ## Testing
